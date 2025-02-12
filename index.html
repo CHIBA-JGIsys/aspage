@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>Salesforce運用フロー可視化サンプル - Update</title>
+  <style>
+    /* 全体レイアウト */
+    body {
+      margin: 20px;
+      font-family: "Segoe UI", Helvetica, Arial, sans-serif;
+      background-color: #fafafa;
+      color: #333;
+    }
+    h1, h2, h3 {
+      margin-bottom: 10px;
+    }
+    h1 {
+      margin-top: 0;
+    }
+    p {
+      line-height: 1.4;
+    }
+
+    /* セクションの共通スタイル */
+    section {
+      margin-bottom: 60px;
+    }
+
+    /* 視覚化パートのフロー全体コンテナ */
+    .flow-container {
+      width: 100%;
+      overflow-x: auto;  /* 横スクロール対応 */
+      padding: 10px 0;
+      margin-bottom: 30px;
+      border-bottom: 1px solid #ccc;
+    }
+
+    /* 各ステップのボックス */
+    .flow-step {
+      display: inline-block;
+      width: 200px;
+      min-height: 140px;
+      border: 2px solid #ccc;
+      border-radius: 8px;
+      background-color: #fff;
+      margin-right: 20px;
+      vertical-align: top;
+      position: relative;
+      box-shadow: 1px 1px 5px rgba(0,0,0,0.1);
+      padding: 10px;
+    }
+    .flow-step:last-child {
+      margin-right: 0;
+    }
+    .flow-step h4 {
+      margin: 0 0 8px 0;
+      font-size: 16px;
+      color: #333;
+    }
+    .flow-step .sub-info {
+      font-size: 13px;
+      color: #666;
+    }
+
+    /* 矢印 */
+    .arrow {
+      display: inline-block;
+      width: 30px;
+      vertical-align: middle;
+      margin-right: 20px;
+      position: relative;
+    }
+    .arrow::after {
+      content: "→";
+      font-size: 24px;
+      color: #999;
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      left: 0;
+    }
+
+    /* KPIやSalesforce項目の詳細テーブル */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+      background-color: #fff;
+    }
+    th, td {
+      padding: 10px;
+      border: 1px solid #ccc;
+      font-size: 14px;
+      vertical-align: top;
+    }
+    th {
+      background-color: #f1f1f1;
+      text-align: center;
+    }
+    td code {
+      background-color: #fafafa;
+      padding: 2px 4px;
+      font-size: 90%;
+      color: #555;
+      border-radius: 3px;
+    }
+    .highlight {
+      background-color: #e6ffcc; /* うす緑 */
+    }
+
+    /* 見出し強調 */
+    .label-kpi {
+      color: #d20000;
+      font-weight: bold;
+    }
+    .label-object {
+      color: #0070d2; /* Salesforceブルーに近い */
+      font-weight: bold;
+    }
+
+    /* メモ風吹き出し */
+    .note {
+      border: 1px dashed #999;
+      background-color: #fff8d2;
+      padding: 10px;
+      border-radius: 5px;
+      margin-top: 10px;
+      font-size: 13px;
+      color: #555;
+    }
+
+    /* バージョンアップ時の強調コメント */
+    .update-comment {
+      font-size: 12px;
+      color: #008080;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>Salesforce運用フロー - 2023/XX/XX Update版</h1>
+    <p>本サンプルでは以下の点を考慮し、<strong>新人メンバー（新規営業）</strong>と<strong>レギュラーメンバー（既存・非掲載案件も含む）</strong>のフローを可視化しています。</p>
+    <ul>
+      <li>新人は「<strong>新規</strong>アタック～受注」の各KPIを明確に</li>
+      <li>レギュラーは「<strong>継続率（更新）</strong>」および「<strong>非掲載・落ち案件</strong>の再アタック」を管理</li>
+      <li>前回MTGで挙がった「<em>掲載頻度</em>」「<em>媒体</em>」「<em>取引金額</em>（単価/アベレージ）」などの抽出条件にも対応</li>
+    </ul>
+  </header>
+
+  <!-- 新規営業フロー -->
+  <section>
+    <h2>1. 新規営業フロー（新人メンバー向け）</h2>
+    <p>以下は <strong>新規アタック → 新規アポ獲得 → 新規有効商談 → 新規審査回収 → 新規審査通過 → 新規入金 → 新規受注</strong> の流れを、Salesforceステージやカスタム項目と連動して管理する例です。  
+      <span class="update-comment">※前回MTGの要望により「アポ取得」を「<strong>新規アポ獲得</strong>」等に修正し、各ステップ名に「新規」を冠しています。</span></p>
+
+    <div class="flow-container">
+      <!-- ステップ1 -->
+      <div class="flow-step">
+        <h4>① 新規アタック</h4>
+        <div class="sub-info">
+          <span class="label-kpi">KPI:新規アタック数</span><br>
+          <span class="label-object">Opp/Lead.Status</span> = 'アタック済'
+        </div>
+        <div class="note">
+          店舗担当者と<strong>初コンタクト</strong>できた時にカウント。<br>
+          不在なら除外。
+        </div>
+      </div>
+      <div class="arrow"></div>
+
+      <!-- ステップ2 -->
+      <div class="flow-step">
+        <h4>② 新規アポ獲得</h4>
+        <div class="sub-info">
+          <span class="label-kpi">KPI:新規アポ獲得数</span><br>
+          <span class="label-object">Opp/Lead.Status</span> = 'アポ取得'
+        </div>
+        <div class="note">
+          <strong>日時が確定</strong>したらカウント。<br>
+          イベント登録やステータス変更で管理。
+        </div>
+      </div>
+      <div class="arrow"></div>
+
+      <!-- ステップ3 -->
+      <div class="flow-step">
+        <h4>③ 新規有効商談</h4>
+        <div class="sub-info">
+          <span class="label-kpi">KPI:新規有効商談数</span><br>
+          <span class="label-object">Opp/Stage</span> = '商談中'
+        </div>
+        <div class="note">
+          実際にヒアリング &amp; プラン提案ができた件数。<br>
+          商談メモや添付資料の共有を徹底。
+        </div>
+      </div>
+      <div class="arrow"></div>
+
+      <!-- ステップ4 -->
+      <div class="flow-step">
+        <h4>④ 新規審査回収</h4>
+        <div class="sub-info">
+          <span class="label-kpi">KPI:新規審査回収数</span><br>
+          <span class="label-object">Opp/Stage</span> = '審査書類回収'
+        </div>
+        <div class="note">
+          審査書類の署名を受領し提出待ちの状態。<br>
+          書類不備や提出忘れを防ぐ。
+        </div>
+      </div>
+      <div class="arrow"></div>
+
+      <!-- ステップ5 -->
+      <div class="flow-step">
+        <h4>⑤ 新規審査通過</h4>
+        <div class="sub-info">
+          <span class="label-kpi">KPI:新規審査通過数</span><br>
+          <span class="label-object">Opp/Stage</span> = '審査通過'
+        </div>
+        <div class="note">
+          メーカー等の最終OKを確認。<br>
+          差し戻し対応時は別ステータスへ。
+        </div>
+      </div>
+      <div class="arrow"></div>
+
+      <!-- ステップ6 -->
+      <div class="flow-step">
+        <h4>⑥ 新規入金確認</h4>
+        <div class="sub-info">
+          <span class="label-object">Opp/Stage</span> = '入金待ち'
+        </div>
+        <div class="note">
+          前金・後払いなど、<strong>入金日</strong>を確実に記録。
+        </div>
+      </div>
+      <div class="arrow"></div>
+
+      <!-- ステップ7 -->
+      <div class="flow-step">
+        <h4>⑦ 新規受注</h4>
+        <div class="sub-info">
+          <span class="label-kpi">KPI:新規受注数</span><br>
+          <span class="label-object">Opp/Stage</span> = 'Closed Won'
+        </div>
+        <div class="note">
+          掲載開始＝売上計上完了の目安。<br>
+          <strong>金額(Amount)</strong>や実際の受注日(CloseDate)を確定。
+        </div>
+      </div>
+    </div><!--/.flow-container-->
+  </section>
+
+  <!-- 既存営業フロー -->
+  <section>
+    <h2>2. 既存営業フロー（レギュラーメンバー）</h2>
+    <p>
+      レギュラーメンバーは <strong>更新営業（=継続率UP）</strong> および <strong>非掲載・落ち案件の再アタック</strong> や <strong>アップセル／クロスセル</strong> を行うイメージです。<br>
+      <em>Account</em>（店舗） + <em>Contract</em>/<em>Opportunity</em> で更新管理するほか、<strong>過去の掲載頻度・取引金額（単価/アベレージ）</strong>などでリスト抽出し、アタック優先度を決定します。
+    </p>
+
+    <div class="flow-container">
+      <!-- ステップA -->
+      <div class="flow-step" style="width:220px;">
+        <h4>① 更新対象の抽出</h4>
+        <div class="sub-info">
+          <span class="label-kpi">母数:更新対象件数</span><br>
+          <span class="label-object">Contract.EndDate</span> など<br>
+          <span class="label-object">Account.Lank__c</span><br>
+          <span class="label-object">（掲載頻度 / 単価 も参照）</span>
+        </div>
+        <div class="note">
+          月初または期間ごとに、<strong>契約終了予定日</strong>で抽出。<br>
+          単価・掲載実績 (LTV) などを考慮し優先度を判定。
+        </div>
+      </div>
+      <div class="arrow"></div>
+
+      <!-- ステップB -->
+      <div class="flow-step" style="width:220px;">
+        <h4>② 接触・反響確認</h4>
+        <div class="sub-info">
+          <span class="label-kpi">KPI:接触数</span><br>
+          <span class="label-object">Task/Activity</span>
+        </div>
+        <div class="note">
+          ふらっと訪問や電話等で現在の反響を確認。<br>
+          ニーズが薄そうなら優先度調整。
+        </div>
+      </div>
+      <div class="arrow"></div>
+
+      <!-- ステップC -->
+      <div class="flow-step" style="width:220px;">
+        <h4>③ 継続率の確認</h4>
+        <div class="sub-info">
+          <span class="label-kpi">KPI:継続率</span><br>
+          <span class="label-object">Opportunity.Stage</span> = '更新提案中'
+        </div>
+        <div class="note">
+          続けるか終了か？<br>
+          営業担当が再提案などフォロー。
+        </div>
+      </div>
+      <div class="arrow"></div>
+
+      <!-- ステップD -->
+      <div class="flow-step" style="width:220px;">
+        <h4>④ 契約更新</h4>
+        <div class="sub-info">
+          <span class="label-object">Opportunity.Stage</span> = 'Closed Won'<br>
+          <span class="label-object">Contract.Renewal__c</span> など
+        </div>
+        <div class="note">
+          継続確定→売上計上。<br>
+          更新失敗なら終了理由を記録。
+        </div>
+      </div>
+      <div class="arrow"></div>
+
+      <!-- ステップE -->
+      <div class="flow-step" style="width:220px;">
+        <h4>⑤ アップセル／クロスセル</h4>
+        <div class="sub-info">
+          <span class="label-kpi">追加売上</span><br>
+          <span class="label-object">Opportunity.Product</span> / <span class="label-object">RecordType</span>
+        </div>
+        <div class="note">
+          タイプアップ（上位プラン）や他媒体追加など。<br>
+          同一アカウントに<br>新規Oppを立ち上げる。
+        </div>
+      </div>
+
+    </div><!--/.flow-container-->
+
+    <div class="note" style="margin-top:30px;">
+      <strong>※非掲載・落ち案件の再アタックについて</strong><br>
+      過去に掲載停止／不成立となった店舗も、<em>掲載履歴</em>や<em>取引金額</em>を参照して抽出可能。<br>
+      流れ自体は「新規アタック～受注」と同様のステージ管理を行い、<strong>担当営業</strong>の変更履歴等も記録しておくと便利です。
+    </div>
+  </section>
+
+  <!-- KPIとオブジェクトの対応表 -->
+  <section>
+    <h2>3. KPIとSalesforceオブジェクト・主要項目の対応表</h2>
+    <p>前述のフローで使用する主なKPIとSalesforce項目の関連です。  
+       <strong>「どのステップで」「どんな項目を」「いつ入力すれば」「何がKPIに反映されるか」</strong> を整理し、運用時の認識を揃えます。</p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>営業フェーズ / KPI</th>
+          <th>SFオブジェクト / 項目例</th>
+          <th>入力のタイミング / ルール</th>
+          <th>備考</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="highlight">
+            <strong>新規アタック数</strong><br>
+            (新人向け)
+          </td>
+          <td>
+            <span class="label-object">Lead</span> or <span class="label-object">Opportunity</span><br>
+            <code>Status</code> = 'アタック済'
+          </td>
+          <td>
+            店舗担当者と直接話せたら<br>
+            ステータスを「アタック済」に変更
+          </td>
+          <td>
+            初回接触が条件。<br>
+            不在等は未カウント。
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <strong>新規アポ獲得数</strong><br>
+            (新人向け)
+          </td>
+          <td>
+            <span class="label-object">Opportunity</span>.<code>Stage</code> = 'アポ取得'<br>
+            もしくは <span class="label-object">Event</span> で<br>予定日を登録
+          </td>
+          <td>
+            日時が確定した時点で<br>ステージ変更 or イベント作成
+          </td>
+          <td>
+            キーマンの役職や連絡先は<br>Contactで紐付け
+          </td>
+        </tr>
+        <tr>
+          <td class="highlight">
+            <strong>新規有効商談数</strong><br>
+            (新人向け)
+          </td>
+          <td>
+            <span class="label-object">Opportunity</span>.<code>Stage</code> = '商談中'
+          </td>
+          <td>
+            ヒアリング・提案を実施。<br>活動履歴(Task)で記録
+          </td>
+          <td>
+            商談メモや添付を<br>Chatterなどで共有
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <strong>新規審査回収 / 新規審査通過</strong>
+          </td>
+          <td>
+            <span class="label-object">Opportunity</span>.<code>Stage</code> = '審査回収' → '審査通過'
+          </td>
+          <td>
+            書類受領→<code>Stage</code>='審査回収'<br>
+            メーカーOK→<code>Stage</code>='審査通過'
+          </td>
+          <td>
+            差し戻しは<br>別ステータス管理も可能
+          </td>
+        </tr>
+        <tr>
+          <td class="highlight">
+            <strong>新規受注数</strong><br>
+            (入金後)
+          </td>
+          <td>
+            <span class="label-object">Opportunity</span>.<code>Stage</code> = 'Closed Won'
+          </td>
+          <td>
+            入金 + 掲載開始<br>
+            → 勝ちステージ設定
+          </td>
+          <td>
+            <code>Amount</code>で金額<br>
+            <code>CloseDate</code>で受注日
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <strong>継続率 (更新)</strong><br>
+            (既存向け)
+          </td>
+          <td>
+            <span class="label-object">Contract</span>.<code>EndDate</code><br>
+            <span class="label-object">Opportunity</span>.<code>Stage</code> = 'Closed Won'
+          </td>
+          <td>
+            契約終了予定（当月など）を母数に<br>
+            実際に更新(=Closed Won)した件数で計算
+          </td>
+          <td>
+            （更新件数 ÷ 対象件数）×100%<br>
+            <strong>更新率 → 継続率</strong>に表記修正
+          </td>
+        </tr>
+        <tr>
+          <td class="highlight">
+            <strong>アップセル / クロスセル</strong>
+          </td>
+          <td>
+            <span class="label-object">Opportunity</span>.<code>RecordType</code>='Upsell' or 'CrossSell'<br>
+            <span class="label-object">Opportunity</span>.<code>Parent_Account__c</code> 等
+          </td>
+          <td>
+            既存アカウントへ別商談。<br>
+            RecordTypeやチェック項目をON
+          </td>
+          <td>
+            「同一アカウントに新規追加」で<br>売上拡大を狙う
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <strong>接触数 (既存)</strong>
+          </td>
+          <td>
+            <span class="label-object">Task / Activity</span><br>
+            <code>Subject</code>='訪問・電話'
+          </td>
+          <td>
+            店舗へ立ち寄り or 電話したら<br>必ず活動ログを記録
+          </td>
+          <td>
+            高接触数=継続率向上に寄与。<br>
+            進捗モニタリング時に重要
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <footer>
+    <h3>まとめとポイント</h3>
+    <ul>
+      <li>新人メンバーは「<strong>新規</strong>アタック→<strong>新規</strong>アポ→<strong>新規</strong>商談→<strong>新規</strong>審査→<strong>新規</strong>受注」のステップ管理が基本</li>
+      <li>レギュラーメンバーは「<strong>継続率</strong>（更新）」「<strong>非掲載・落ち案件の再アタック</strong>」「<strong>アップセル・クロスセル</strong>」も並行して運用</li>
+      <li>Salesforceの<span class="label-object">Stage / Contract.EndDate / RecordType</span>等で<br>各ステップを明確化し、KPIダッシュボード化を検討</li>
+      <li><strong>掲載頻度・取引金額（単価/アベレージ）</strong>・<strong>担当履歴</strong>などを活用してリスト抽出・優先度判断</li>
+    </ul>
+    <p>以上のフローにより、<strong>現場メンバーごとの進捗把握</strong>や<br>
+       <strong>経営視点のKPI管理</strong>が一貫して行いやすくなります。</p>
+  </footer>
+
+</body>
+</html>
